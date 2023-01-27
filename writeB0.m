@@ -44,8 +44,7 @@ if N(1) ~= N(2) | FOV(1) ~= FOV(2)
     error('In-plane FOV and matrix be square.');
 end
 
-voxSize = FOV./N;  % cm
-
+nx = N(1);
 ny = N(2);
 nz = N(3);
 
@@ -62,52 +61,51 @@ fprintf(fid, '%s\t0\t1\t0\n', arg.exMod);
 fprintf(fid, '%s\t0\t0\t1\n', arg.readoutMod);
 fclose(fid);
 
-% Write entry file.
+% Write TOPPE entry file (to be placed in /usr/g/research/pulseq/ on scanner).
 % This can be edited by hand as needed after copying to scanner.
 toppe.writeentryfile(arg.entryFile, ...
     'filePath', arg.scanFilePath, ...
     'b1ScalingFile', arg.exMod, ...
     'readoutFile', arg.readoutMod);
 
-
-%% Create .mod files
-
+% Create .mod files
 if arg.fatsat
-    % fat sat module
-    fatsat.flip    = 90;
-    fatsat.slThick = 1e5;     % dummy value (determines slice-select gradient, but we won't use it). Just needs to be large to reduce dead time before+after rf pulse
+    % fat sat module (fatsat.mod)
+    fatsat.flip = 90;
+    fatsat.slThick = 1e5;    % dummy value (determines slice-select gradient, but we won't use it). Just needs to be large to reduce dead time before+after rf pulse
     fatsat.tbw = 2;
     fatsat.bw = 440;   % Hz
     fatsat.dur = fatsat.tbw*1e3/fatsat.bw;
-    b1 = toppe.utils.rf.makeslr(fatsat.flip, fatsat.slThick, fatsat.tbw, fatsat.dur, 1e-8, sys, ...
-                    'ftype', 'min', 'type', 'ex', 'writeModFile', false);
+    b1 = toppe.utils.rf.makeslr(fatsat.flip, fatsat.slThick, fatsat.tbw, ...
+        fatsat.dur, 1e-8, sys, ...
+        'ftype', 'min', 'type', 'ex', 'writeModFile', false);
     b1 = toppe.makeGElength(b1);
     toppe.writemod(sys, 'rf', b1, 'ofname', 'fatsat.mod', 'desc', 'fat sat pulse');
+
+    fatChemShift = 3.5;  % fat/water chemical shift (ppm)
+    fatFreq = arg.fatFreqSign*sys.gamma*1e4*sys.B0*fatChemShift*1e-6;  % Hz
 end
 
-% excitation module
+% excitation module (tipdown.mod)
 [ex.rf, ex.g] = toppe.utils.rf.makeslr(flip, arg.slabThick, ...
     arg.tbw, arg.rfDur, nz*arg.nCyclesSpoil, sys, ...
     'ftype', arg.ftype, ...
     'spoilDerate', 0.5, ...
     'ofname', arg.exMod);
 
-% readout module
+% Data acquisition module (readout.mod).
 % Here we use the helper function 'makegre' to do that, but that's not a requirement.
-zres = FOV(3)/N(3);
-toppe.utils.makegre(FOV(1), N(1), zres, sys, ... 
+zres = FOV(3)/nz;
+toppe.utils.makegre(FOV(1), nx, zres, sys, ... 
     'ofname', arg.readoutMod, ...
     'autoChop', arg.autoChop, ...   
     'ncycles', arg.nCyclesSpoil); 
 
-
-%% Write scanloop.txt
+% Write scanloop.txt
 rfphs = 0;              % radians
 rfSpoilSeed_cnt = 0;
-ny = N(2);
-nz = N(3);
 
-toppe.write2loop('setup', sys, 'version', 4);  % initialize file ('scanloop.txt')
+toppe.write2loop('setup', sys, 'version', 4);  % initialize the file
 
 for iz = -1:nz     % We use iz<1 for approach to steady-state
     fprintf('\b\b\b\b\b\b\b\b\b\b\b\b%d of %d', max(1,iz), nz);
@@ -118,9 +116,8 @@ for iz = -1:nz     % We use iz<1 for approach to steady-state
             a_gy = -((iy-1+0.5)-ny/2)/(ny/2) * (iz>0);  
             a_gz = -((iz-1+0.5)-nz/2)/(nz/2) * (iz>0);
 
+            % fat saturation module
             if(arg.fatsat)
-                fatChemShift = 3.5;  % fat/water chemical shift (ppm)
-                fatFreq = arg.fatFreqSign*sys.gamma*1e4*sys.B0*fatChemShift*1e-6;  % Hz
                 toppe.write2loop('fatsat.mod', sys, ...
                     'RFoffset', round(fatFreq), ...   % Hz
                     'RFphase', rfphs);         % radians
@@ -129,17 +126,20 @@ for iz = -1:nz     % We use iz<1 for approach to steady-state
                 rfSpoilSeed_cnt = rfSpoilSeed_cnt + 1;
             end
 
+            % RF excitation module
             toppe.write2loop(arg.exMod, sys, ...
                 'RFamplitude', 1.0, ...
                 'textra', deltaTE(ite), ...
                 'RFphase', rfphs);
 
+            % data acquisition module
             toppe.write2loop(arg.readoutMod, sys, ...
                 'Gamplitude', [1.0 a_gy a_gz]', ...
                 'DAQphase', rfphs, ...
                 'textra', max(deltaTE) - deltaTE(ite), ... % to keep TR constant
                 'slice', max(iz,1), 'echo', ite, 'view', iy);
 
+            % Update rf phase (RF spoiling)
             rfphs = rfphs + (arg.rfSpoilSeed/180*pi)*rfSpoilSeed_cnt ;  % radians
             rfSpoilSeed_cnt = rfSpoilSeed_cnt + 1;
         end
@@ -149,8 +149,6 @@ fprintf('\n');
 toppe.write2loop('finish', sys);  % finalize file
 
 fprintf('TR = %.3f ms\n', toppe.getTRtime(1, 2, sys)*1e3);
-
-%figure; toppe.plotseq(1, 4, sys);
 
 % Create 'sequence stamp' file for TOPPE
 % This file is listed in line 6 of the .entry file

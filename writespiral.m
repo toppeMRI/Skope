@@ -1,6 +1,8 @@
 % Write 2D spiral sequence with TTL triggers,
 % for testing Skope field camera using TOPPE interpreter v5.
 
+toppeVer = 5;
+
 % System hardware specifications.
 % 'maxSlew' and 'maxGrad' are design parameters and can be less than
 % physical limits.
@@ -35,14 +37,16 @@ g = toppe.utils.spiral.makesosreadout(sys, N, FOV, nleaf, ...
     'rewDerate', 0.8);  % derate slew rate during spiral rewinder by this factor (to control PNS)
 
 % Write modules.txt
+% Last column is TTL position within the module (us). 
+trigpos = 1000; % us
 mods.ex = 'tipdown.mod';
 mods.readout = 'readout.mod';
 fid = fopen('modules.txt', 'wt');
 fprintf(fid, 'Total number of unique cores\n');
 fprintf(fid, '%d\n', length(fieldnames(mods)));
-fprintf(fid, 'fname  duration(us)    hasRF?  hasDAQ?\n');
-fprintf(fid, '%s\t0\t1\t0\n', mods.ex);
-fprintf(fid, '%s\t0\t0\t1\n', mods.readout);
+fprintf(fid, 'fname  duration(us)  hasRF?  hasDAQ?  trigpos\n');
+fprintf(fid, '%s\t0\t1\t0\t-1\n', mods.ex);
+fprintf(fid, '%s\t0\t0\t1\t%d\n', mods.readout, trigpos);
 fclose(fid);
 
 % Write entry file (to be placed in /usr/g/research/pulseq/ on scanner host)
@@ -52,15 +56,15 @@ toppe.writeentryfile('toppeN.entry', ...
 
 % Create scanloop.txt
 rfphs = 0;              % radians
-toppe.write2loop('setup', sys, 'version', 5);
+toppe.write2loop('setup', sys, 'version', toppeVer);
 nframes = 20;
 
 for iframe = 1:nframes
-    if ~mod(iframe,10)
+    if ~mod(iframe, 10)
         fprintf([repmat('\b',1,20) sprintf('%d of %d', iframe, nframes)]);
     end
 
-    nTrigPeriod = 5;  % play TTL out pulse every nTrigPeriod TRs
+    nTrigPeriod = 10;  % play TTL out pulse every nTrigPeriod TRs
     if ~mod(iframe, nTrigPeriod)
         trigout = 1;
     else
@@ -75,7 +79,7 @@ for iframe = 1:nframes
         'DAQphase', rfphs, ...
         'slice', 1, 'echo', 1, 'view', iframe, ...
         'trigout', trigout, ...
-        'textra', 50, ...    % add pause at end of TR (ms)
+        'textra', 20, ...    % add pause at end of TR (ms)
         'Gamplitude', [1 1 0]');
 end
 
@@ -88,7 +92,7 @@ toppe.preflightcheck('toppeN.entry', 'seqstamp.txt', sys);
 system(sprintf("tar cf spiral2d.tar modules.txt scanloop.txt *.mod toppeN.entry seqstamp.txt"));
 
 % display sequence
-toppe.plotseq(1, 10, sys);
+toppe.plotseq(1, 2, sys);
 %toppe.playseq(2, sys, 'tpause', 1);
 
 return

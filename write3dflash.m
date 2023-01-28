@@ -24,7 +24,8 @@ FOV = N*res;          % cm
 flip = 5;             % degrees
 fatChemShift = 3.5;   % fat/water chemical shift (ppm)
 fatFreq = -sys.gamma*1e4*sys.B0*fatChemShift*1e-6;   % Hz
-deltaTE = [0 1000/abs(fatFreq)];   % (ms) acquire 2 or more images with different TE
+deltaTE = [0 1000/abs(fatFreq)];   % (ms) acquire 2 or more images with different TE, for B0 mapping
+deltaTE = [0];  % only acquire one image with 'minimum full' TE
 
 % Options
 arg.entryFile = 'toppeN.entry';
@@ -90,7 +91,7 @@ rfSpoilSeed_cnt = 0;
 
 toppe.write2loop('setup', sys, 'version', 5);  % initialize the file
 
-for iz = -1:nz     % We use iz<1 for approach to steady-state
+for iz = 0:nz     % We use iz<1 for approach to steady-state
     fprintf('\b\b\b\b\b\b\b\b\b\b\b\b%d of %d', max(1,iz), nz);
     for iy = 1:ny
         for ite = 1:length(deltaTE)
@@ -134,9 +135,9 @@ toppe.utils.scanmsg(arg.entryFile);
 
 if doplot
     % Plot beginning of sequence
-    figure; toppe.plotseq(1, 2, sys); pause(2);
+    toppe.plotseq(1, 2, sys);
 
     % Play sequence in loop (movie) mode
     nModulesPerTR = 2;
-    figure; toppe.playseq(nModulesPerTR, sys, 'tpause', 0.05, 'nTRskip', 8);
+    toppe.playseq(nModulesPerTR, sys, 'tpause', 0.05, 'nTRskip', 2);
 end

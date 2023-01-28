@@ -5,12 +5,12 @@
 
 addpath ~/github/toppeMRI/toppe/         % +toppe toolbox
 
-doplot = true;   % plot sequence, and view in loop/movie mode
+doplot = false;   % plot sequence, and view in loop/movie mode
 
 % GE system parameters.
 % If desired (e.g., for waveform design or to reduce PNS), 
 % maxSlew and maxGrad can be < system limits.
-sys = toppe.systemspecs('maxSlew', 20, 'slewUnit', 'Gauss/cm/ms', ...
+sys = toppe.systemspecs('maxSlew', 10, 'slewUnit', 'Gauss/cm/ms', ...
     'maxGrad', 5, 'gradUnit', 'Gauss/cm', ...
     'psd_rf_wait', 90, ...       % microseconds
     'psd_grd_wait', 100, ...     % microseconds
@@ -82,6 +82,7 @@ toppe.writeentryfile(arg.entryFile, ...
 zres = FOV(3)/nz;
 toppe.utils.makegre(FOV(1), nx, zres, sys, ... 
     'ofname', arg.readoutMod, ...
+    'dwell', 16, ...      % ADC sample time (must be multiple of 2)
     'autoChop', arg.autoChop, ...   
     'ncycles', arg.nCyclesSpoil); 
 
@@ -129,7 +130,7 @@ fprintf('TR = %.3f ms\n', toppe.getTRtime(1, 2, sys)*1e3);
 toppe.preflightcheck(arg.entryFile, 'seqstamp.txt', sys);
 
 % Write files to tar archive (for convenience).
-system(sprintf('tar cf b0.tar %s seqstamp.txt scanloop.txt modules.txt *.mod', arg.entryFile));
+system(sprintf('tar cf spgr.tar %s seqstamp.txt scanloop.txt modules.txt *.mod', arg.entryFile));
 
 toppe.utils.scanmsg(arg.entryFile);
 

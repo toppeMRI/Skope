@@ -1,17 +1,29 @@
 % Write 2D spiral sequence with TTL triggers,
 % for testing Skope field camera using TOPPE interpreter v5.
 
-toppeVer = 5;
-
 % System hardware specifications.
 % 'maxSlew' and 'maxGrad' are design parameters and can be less than
 % physical limits.
 sys = toppe.systemspecs('maxSlew', 13, 'slewUnit', 'Gauss/cm/ms', ...
-    'maxGrad', 4, 'gradUnit', 'Gauss/cm', ...
-    'myrfdel', 152, ... % psd_rf_wait
-    'daqdel', 152, ...  % psd_grd_wait
-    'gradient', 'hrmb', ... % xrm: MR750; hrmb: UHP; hrmw: Premier
+    'maxGrad', 5, 'gradUnit', 'Gauss/cm', ...
+    'psd_rf_wait', 90, ...       % microseconds
+    'psd_grd_wait', 100, ...     % microseconds
+    'gradient', 'xrm', ...       % xrm: MR750 (default); hrmw: Premier; hrmb: UHP
+    'timessi', 100, ...
     'B0', 3);           % Tesla
+
+% Write modules.txt
+% Last column is TTL position within the module (us). 
+trigpos = 1000; % us
+mods.ex = 'tipdown.mod';
+mods.readout = 'readout.mod';
+fid = fopen('modules.txt', 'wt');
+fprintf(fid, 'Total number of unique cores\n');
+fprintf(fid, '%d\n', length(fieldnames(mods)));
+fprintf(fid, 'fname  duration(us)  hasRF?  hasDAQ?  trigpos\n');
+fprintf(fid, '%s\t0\t1\t0\t-1\n', mods.ex);
+fprintf(fid, '%s\t0\t0\t1\t%d\n', mods.readout, trigpos);
+fclose(fid);
 
 % Create slice-selective excitation (tipdown.mod)
 tbw = 6; dur = 2.5;
@@ -28,26 +40,12 @@ res = 0.3;       % cm
 N = [92 92 1];   % image matrix size
 FOV = N*res;     % cm
 nleaf = 1;     % number of spirals (shots) per kz-encoding level
-
 g = toppe.utils.spiral.makesosreadout(sys, N, FOV, nleaf, ...
     'dsamp', 700, ...  % number of 4us samples in densely (fully) sampled center
     'Router', 3, ...   % undersampling factor outside densely sampled center
     'ofname', mods.readout, ...
     'inout', 'in', ...
     'rewDerate', 0.8);  % derate slew rate during spiral rewinder by this factor (to control PNS)
-
-% Write modules.txt
-% Last column is TTL position within the module (us). 
-trigpos = 1000; % us
-mods.ex = 'tipdown.mod';
-mods.readout = 'readout.mod';
-fid = fopen('modules.txt', 'wt');
-fprintf(fid, 'Total number of unique cores\n');
-fprintf(fid, '%d\n', length(fieldnames(mods)));
-fprintf(fid, 'fname  duration(us)  hasRF?  hasDAQ?  trigpos\n');
-fprintf(fid, '%s\t0\t1\t0\t-1\n', mods.ex);
-fprintf(fid, '%s\t0\t0\t1\t%d\n', mods.readout, trigpos);
-fclose(fid);
 
 % Write entry file (to be placed in /usr/g/research/pulseq/ on scanner host)
 % This can be edited by hand as needed after copying to scanner.
@@ -56,7 +54,7 @@ toppe.writeentryfile('toppeN.entry', ...
 
 % Create scanloop.txt
 rfphs = 0;              % radians
-toppe.write2loop('setup', sys, 'version', toppeVer);
+toppe.write2loop('setup', sys, 'version', 5);
 nframes = 20;
 
 for iframe = 1:nframes
@@ -64,7 +62,7 @@ for iframe = 1:nframes
         fprintf([repmat('\b',1,20) sprintf('%d of %d', iframe, nframes)]);
     end
 
-    nTrigPeriod = 10;  % play TTL out pulse every nTrigPeriod TRs
+    nTrigPeriod = 15;  % play TTL out pulse every nTrigPeriod TRs
     if ~mod(iframe, nTrigPeriod)
         trigout = 1;
     else
@@ -79,7 +77,7 @@ for iframe = 1:nframes
         'DAQphase', rfphs, ...
         'slice', 1, 'echo', 1, 'view', iframe, ...
         'trigout', trigout, ...
-        'textra', 20, ...    % add pause at end of TR (ms)
+        'textra', 10, ...    % add pause at end of TR (ms)
         'Gamplitude', [1 1 0]');
 end
 
@@ -89,21 +87,8 @@ toppe.write2loop('finish', sys);
 % Create 'sequence stamp' file 
 toppe.preflightcheck('toppeN.entry', 'seqstamp.txt', sys);
 
-system(sprintf("tar cf spiral2d.tar modules.txt scanloop.txt *.mod toppeN.entry seqstamp.txt"));
+system(sprintf("tar cf spiral.tar modules.txt scanloop.txt *.mod toppeN.entry seqstamp.txt"));
 
 % display sequence
 toppe.plotseq(1, 2, sys);
 %toppe.playseq(2, sys, 'tpause', 1);
-
-return
-
-%% convert to Pulseq
-% addpath ~/gitlab/toppe/pulseq/
-cd tar
-ge2seq('scan.tar');
-seq = mr.Sequence();
-seq.read('out.seq');
-seq.plot_sg('TimeRange', [10 10.05]);
-cd ..
-
-

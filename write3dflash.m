@@ -29,8 +29,8 @@ deltaTE = [0 1000/abs(fatFreq)];   % (ms) acquire 2 or more images with differen
 deltaTE = [0];  % only acquire one image with 'minimum full' TE
 
 % Options
-arg.entryFile = 'toppeN.entry';
-arg.scanFilePath = '/usr/g/research/pulseq/cal/b0/';
+arg.entryFile = 'toppe0.entry';
+arg.scanFilePath = '/usr/g/research/pulseq/flash/';
 arg.tbw = 8;                     % RF pulse time-bandwidth product
 arg.rfDur = 0.5;                   % RF pulse duration (ms)
 arg.ftype = 'min';               % 'min': minimum-phase SLR pulse; 'ls': linear phase

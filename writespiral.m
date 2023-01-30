@@ -49,7 +49,7 @@ g = toppe.utils.spiral.makesosreadout(sys, N, FOV, nleaf, ...
 
 % Write entry file (to be placed in /usr/g/research/pulseq/ on scanner host)
 % This can be edited by hand as needed after copying to scanner.
-toppe.writeentryfile('toppeN.entry', ...
+toppe.writeentryfile('loppe1.entry', ...
     'filePath', '/usr/g/research/pulseq/spiral/');
 
 % Create scanloop.txt
@@ -85,9 +85,9 @@ fprintf('\n');
 toppe.write2loop('finish', sys);
 
 % Create 'sequence stamp' file 
-toppe.preflightcheck('toppeN.entry', 'seqstamp.txt', sys);
+toppe.preflightcheck('toppe1.entry', 'seqstamp.txt', sys);
 
-system(sprintf("tar cf spiral.tar modules.txt scanloop.txt *.mod toppeN.entry seqstamp.txt"));
+system(sprintf("tar cf spiral.tar modules.txt scanloop.txt *.mod toppe1.entry seqstamp.txt"));
 
 % display sequence
 toppe.plotseq(1, 2, sys);

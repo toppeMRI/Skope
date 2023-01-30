@@ -1,7 +1,9 @@
 # Pulse sequences for Skope field camera installation and use on GE scanners
 
 For general scan instructions with TOPPE, 
-see README.md in <https://github.com/jfnielsen/TOPPEpsdSourceCode/>.
+please see <https://github.com/jfnielsen/TOPPEpsdSourceCode/>.
+The instructions below provide additional details particular to
+the sequences included here.
 
 
 ## Setup
